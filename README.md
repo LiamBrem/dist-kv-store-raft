@@ -92,6 +92,7 @@ value := client.Get("key")
 ```
 
 ## Project Structure
+```
 raft-kv/
 ├── go.mod
 ├── go.sum
@@ -125,7 +126,7 @@ raft-kv/
     ├── partition_test.go    # Network partition scenarios
     ├── failure_test.go      # Node failure/recovery scenarios
     └── helpers.go           # Test utilities (start cluster, inject failures)
-
+```
 
 ### Building: 
 ```
