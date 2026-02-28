@@ -12,6 +12,6 @@ const (
 
 const (
 	HeartbeatInterval = 100 * time.Millisecond
-	ElectiontimeoutMin = 150 * time.Millisecond
+	ElectionTimeoutMin = 150 * time.Millisecond
 	ElectionTimeoutMax = 300 * time.Millisecond
 )

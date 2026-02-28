@@ -63,7 +63,7 @@ func (rn *RaftNode) Stop() {
 
 // returns random timeout between min and max
 func randomElectionTimeout() time.Duration {
-	diff := ElectionTimeoutMax - ElectiontimeoutMin
+	diff := ElectionTimeoutMax - ElectionTimeoutMin
 	return ElectionTimeoutMin + time.Duration(rand.Int63n(int64(diff)))
 }
 
