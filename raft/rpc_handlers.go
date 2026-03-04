@@ -42,8 +42,8 @@ func (rn *RaftNode) sendRequestVote(peerAddr string, args *RequestVote, reply *R
 	return true
 }
 
-// HandleRequestVote implements the gRPC service
-func (rn *RaftNode) HandleRequestVote(ctx context.Context, req *pb.RequestVoteRequest) (*pb.RequestVoteResponse, error) {
+// RequestVote implements the gRPC service
+func (rn *RaftNode) RequestVote(ctx context.Context, req *pb.RequestVoteRequest) (*pb.RequestVoteResponse, error) {
 	rn.mu.Lock()
 	defer rn.mu.Unlock()
 
@@ -98,8 +98,8 @@ func (rn *RaftNode) HandleRequestVote(ctx context.Context, req *pb.RequestVoteRe
 	return resp, nil
 }
 
-// HandleAppendEntries implements the gRPC service for AppendEntries RPC
-func (rn *RaftNode) HandleAppendEntries(ctx context.Context, req *pb.AppendEntriesRequest) (*pb.AppendEntriesResponse, error) {
+// AppendEntries implements the gRPC service for AppendEntries RPC
+func (rn *RaftNode) AppendEntries(ctx context.Context, req *pb.AppendEntriesRequest) (*pb.AppendEntriesResponse, error) {
 	rn.mu.Lock()
 	defer rn.mu.Unlock()
 

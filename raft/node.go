@@ -5,9 +5,12 @@ import (
 	"math/rand"
 	"sync"
 	"time"
+
+	pb "github.com/liambrem/dist-kv-store-raft/proto"
 )
 
 type RaftNode struct {
+	pb.UnimplementedRaftServiceServer
 	mu sync.Mutex
 
 	id    int
@@ -78,15 +81,15 @@ func (rn *RaftNode) run() {
 		switch state {
 		case Follower:
 			fmt.Printf("[Node %d] Running as Follower (term %d)\n", rn.id, rn.currentTerm)
-			rn.runFollower() // to implement
+			rn.runFollower()
 
 		case Candidate:
 			fmt.Printf("[Node %d] Running as Candidate (term %d)\n", rn.id, rn.currentTerm)
-			rn.runCandidate() // to implement
+			rn.runCandidate()
 
 		case Leader:
 			fmt.Printf("[Node %d] Running as Leader (term %d)\n", rn.id, rn.currentTerm)
-			rn.runLeader() // to implement
+			rn.runLeader()
 		}
 
 		// should stop
