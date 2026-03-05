@@ -9,6 +9,13 @@ import (
 	pb "github.com/liambrem/dist-kv-store-raft/proto"
 )
 
+// ApplyMsg is sent to the application when a log entry is committed
+type ApplyMsg struct {
+	CommandValid bool
+	Command      string
+	CommandIndex int
+}
+
 type RaftNode struct {
 	pb.UnimplementedRaftServiceServer
 	mu sync.Mutex
@@ -33,6 +40,7 @@ type RaftNode struct {
 	grantVoteCh chan bool     // when vote is granted
 	leaderCh    chan bool     // when node becomes leader
 	commitCh    chan bool     // when new entries committed
+	applyCh     chan ApplyMsg // send committed commands to application
 	stopCh      chan struct{} // to shut down
 }
 
@@ -52,12 +60,14 @@ func NewRaftNode(id int, peers []string) *RaftNode {
 		grantVoteCh: make(chan bool, 1),
 		leaderCh:    make(chan bool, 1),
 		commitCh:    make(chan bool, 1),
+		applyCh:     make(chan ApplyMsg, 100),
 		stopCh:      make(chan struct{}),
 	}
 }
 
 func (rn *RaftNode) Start() {
 	go rn.run()
+	go rn.applyCommitted() // Start apply loop
 }
 
 func (rn *RaftNode) Stop() {
@@ -98,5 +108,71 @@ func (rn *RaftNode) run() {
 			return
 		default:
 		}
+	}
+}
+
+// GetApplyCh returns the channel for committed commands
+func (rn *RaftNode) GetApplyCh() chan ApplyMsg {
+	return rn.applyCh
+}
+
+// ProposeCommand submits a new command to the Raft log
+// Returns: (index, term, isLeader)
+func (rn *RaftNode) ProposeCommand(command string) (int, int, bool) {
+	rn.mu.Lock()
+	defer rn.mu.Unlock()
+
+	if rn.state != Leader {
+		return -1, -1, false
+	}
+
+	// Create new log entry
+	index := len(rn.log)
+	entry := LogEntry{
+		Term:    rn.currentTerm,
+		Index:   index,
+		Command: command,
+	}
+
+	// Append to log
+	rn.log = append(rn.log, entry)
+	fmt.Printf("[Node %d] Appended command to log at index %d: %s\n", rn.id, index, command)
+
+	// TODO: Trigger replication to followers
+	// For now, since we don't have full replication, we'll just commit locally
+	// In a full implementation, we'd wait for majority replication
+
+	return index, rn.currentTerm, true
+}
+
+// applyCommitted watches for newly committed log entries and applies them
+func (rn *RaftNode) applyCommitted() {
+	for {
+		select {
+		case <-rn.stopCh:
+			return
+		default:
+		}
+
+		rn.mu.Lock()
+		// Apply any entries between lastApplied and commitIndex
+		for rn.lastApplied < rn.commitIndex {
+			rn.lastApplied++
+			if rn.lastApplied < len(rn.log) {
+				entry := rn.log[rn.lastApplied]
+				msg := ApplyMsg{
+					CommandValid: true,
+					Command:      entry.Command,
+					CommandIndex: rn.lastApplied,
+				}
+
+				rn.mu.Unlock()
+				rn.applyCh <- msg
+				rn.mu.Lock()
+			}
+		}
+		rn.mu.Unlock()
+
+		time.Sleep(10 * time.Millisecond)
 	}
 }
