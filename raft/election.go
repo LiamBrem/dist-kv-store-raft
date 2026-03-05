@@ -22,16 +22,16 @@ func (rn *RaftNode) runFollower() {
 			rn.mu.Unlock()
 			return
 
-		case <- rn.stopCh:
+		case <-rn.stopCh:
 			return
 		}
 	}
 }
 
-func (rn *RaftNode) runCandidate(){
+func (rn *RaftNode) runCandidate() {
 	rn.mu.Lock()
 	rn.currentTerm++ // increment current term
-	rn.votedFor = rn.id 
+	rn.votedFor = rn.id
 	rn.mu.Unlock()
 
 	timeout := randomElectionTimeout()
@@ -41,8 +41,8 @@ func (rn *RaftNode) runCandidate(){
 	// start election
 	go rn.requestVote()
 
-	votesReceived := 1 // vote for self
-	votesNeeded := len(rn.peers) / 2 + 1 // majority
+	votesReceived := 1                 // vote for self
+	votesNeeded := len(rn.peers)/2 + 1 // majority
 
 	for {
 		select {
@@ -57,13 +57,11 @@ func (rn *RaftNode) runCandidate(){
 			}
 
 		case <-rn.heartbeatCh:
-			// another leader
-			if true { // TO IMPLEMENT: if candidate term <= follower term
-				rn.mu.Lock()
-				rn.state = Follower
-				rn.mu.Unlock()
-				return
-			}
+			// another leader exists, step down
+			rn.mu.Lock()
+			rn.state = Follower
+			rn.mu.Unlock()
+			return
 
 		case <-timer.C:
 			// timeout - start new election
@@ -83,7 +81,7 @@ func (rn *RaftNode) runLeader() {
 		rn.nextIndex[i] = len(rn.log)
 	}
 	for i := range rn.matchIndex {
-		rn.matchIndex[i] = -1;
+		rn.matchIndex[i] = -1
 	}
 	rn.mu.Unlock()
 
@@ -91,6 +89,14 @@ func (rn *RaftNode) runLeader() {
 	defer ticker.Stop()
 
 	for {
+		// Check if still leader (could have stepped down due to higher term)
+		rn.mu.Lock()
+		if rn.state != Leader {
+			rn.mu.Unlock()
+			return
+		}
+		rn.mu.Unlock()
+
 		select {
 		case <-ticker.C:
 			go rn.sendHeartbeats()
@@ -101,55 +107,54 @@ func (rn *RaftNode) runLeader() {
 
 }
 
-
 func (rn *RaftNode) requestVote() {
-    rn.mu.Lock()
-    lastLogIndex := len(rn.log) - 1
-    lastLogTerm := 0
-    if lastLogIndex >= 0 {
-        lastLogTerm = rn.log[lastLogIndex].Term
-    }
-    
-    args := RequestVote{
-        Term:         rn.currentTerm,
-        CandidateId:  rn.id,
-        LastLogIndex: lastLogIndex,
-        LastLogTerm:  lastLogTerm,
-    }
-    rn.mu.Unlock()
+	rn.mu.Lock()
+	lastLogIndex := len(rn.log) - 1
+	lastLogTerm := 0
+	if lastLogIndex >= 0 {
+		lastLogTerm = rn.log[lastLogIndex].Term
+	}
 
-    // Send RequestVote RPC to all peers in parallel
-    for i, peer := range rn.peers {
-        go func(peerAddr string, peerIndex int) {
-            var reply RequestVoteReply
-            
-            // macke RPC call to peer
-            ok := rn.sendRequestVote(peerAddr, &args, &reply)
-            
-            if !ok {
-                return // RPC failed
-            }
+	args := RequestVote{
+		Term:         rn.currentTerm,
+		CandidateId:  rn.id,
+		LastLogIndex: lastLogIndex,
+		LastLogTerm:  lastLogTerm,
+	}
+	rn.mu.Unlock()
 
-            rn.mu.Lock()
-            defer rn.mu.Unlock()
+	// Send RequestVote RPC to all peers in parallel
+	for i, peer := range rn.peers {
+		go func(peerAddr string, peerIndex int) {
+			var reply RequestVoteReply
 
-            // if reply term is higher, step down
-            if reply.Term > rn.currentTerm {
-                rn.currentTerm = reply.Term
-                rn.state = Follower
-                rn.votedFor = -1
-                return
-            }
+			// macke RPC call to peer
+			ok := rn.sendRequestVote(peerAddr, &args, &reply)
 
-            // if vote granted and still a candidate
-            if reply.VoteGranted && rn.state == Candidate {
-                // signal vote received
-                select {
-                case rn.grantVoteCh <- true:
-                default:
-                    // channel full, vote already counted
-                }
-            }
-        }(peer, i)
-    }
+			if !ok {
+				return // RPC failed
+			}
+
+			rn.mu.Lock()
+			defer rn.mu.Unlock()
+
+			// if reply term is higher, step down
+			if reply.Term > rn.currentTerm {
+				rn.currentTerm = reply.Term
+				rn.state = Follower
+				rn.votedFor = -1
+				return
+			}
+
+			// if vote granted and still a candidate
+			if reply.VoteGranted && rn.state == Candidate {
+				// signal vote received
+				select {
+				case rn.grantVoteCh <- true:
+				default:
+					// channel full, vote already counted
+				}
+			}
+		}(peer, i)
+	}
 }

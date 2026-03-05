@@ -2,6 +2,7 @@ package raft
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	pb "github.com/liambrem/dist-kv-store-raft/proto"
@@ -23,7 +24,10 @@ func (rn *RaftNode) sendHeartbeats() {
 		Entries:      []LogEntry{}, // empty for heartbeat
 		LeaderCommit: rn.commitIndex,
 	}
+	term := rn.currentTerm
 	rn.mu.Unlock()
+
+	fmt.Printf("[Node %d] Sending heartbeats (term %d) to %d peers\n", args.LeaderId, term, len(rn.peers))
 
 	// Send to all peers in parallel
 	for _, peer := range rn.peers {
@@ -32,6 +36,7 @@ func (rn *RaftNode) sendHeartbeats() {
 			ok := rn.sendAppendEntries(peerAddr, &args, &reply)
 
 			if !ok {
+				fmt.Printf("[Node %d] Heartbeat to %s failed\n", args.LeaderId, peerAddr)
 				return // RPC failed
 			}
 
@@ -40,6 +45,7 @@ func (rn *RaftNode) sendHeartbeats() {
 
 			// If reply term is higher, step down
 			if reply.Term > rn.currentTerm {
+				fmt.Printf("[Node %d] Stepping down: received higher term %d from %s\n", rn.id, reply.Term, peerAddr)
 				rn.currentTerm = reply.Term
 				rn.state = Follower
 				rn.votedFor = -1

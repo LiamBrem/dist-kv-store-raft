@@ -2,6 +2,7 @@ package raft
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	pb "github.com/liambrem/dist-kv-store-raft/proto"
@@ -140,6 +141,7 @@ func (rn *RaftNode) AppendEntries(ctx context.Context, req *pb.AppendEntriesRequ
 		// Reset election timeout by signaling heartbeat received
 		select {
 		case rn.heartbeatCh <- true:
+			fmt.Printf("[Node %d] Received heartbeat from leader %d (term %d)\n", rn.id, args.LeaderId, args.Term)
 		default:
 		}
 	}
