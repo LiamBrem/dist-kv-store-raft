@@ -176,3 +176,24 @@ func (rn *RaftNode) applyCommitted() {
 		time.Sleep(10 * time.Millisecond)
 	}
 }
+
+// IsLeader returns true if this node is the leader
+func (rn *RaftNode) IsLeader() bool {
+	rn.mu.Lock()
+	defer rn.mu.Unlock()
+	return rn.state == Leader
+}
+
+// GetState returns the current state of the node
+func (rn *RaftNode) GetState() NodeState {
+	rn.mu.Lock()
+	defer rn.mu.Unlock()
+	return rn.state
+}
+
+// GetTerm returns the current term
+func (rn *RaftNode) GetTerm() int {
+	rn.mu.Lock()
+	defer rn.mu.Unlock()
+	return rn.currentTerm
+}
